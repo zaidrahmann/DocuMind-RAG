@@ -1,195 +1,149 @@
 # DocuMind-RAG
 
-**Production-ready Retrieval-Augmented Generation (RAG) pipeline for document Q&A.** Ask questions about your PDFs and get AI-generated answers with source citations.
+**RAG over your PDFs: ask questions, get answers with sources.**
+
+Production-ready Retrieval-Augmented Generation pipeline. Point it at your documents, build an index once, then query via CLI or API—with cited sources every time.
 
 ---
 
-## Features
+## Proof it works
 
-- **PDF ingestion** — Load PDFs from a directory, extract text per page
-- **Token-based chunking** — Tiktoken-based splitting with configurable chunk size and overlap
-- **Multilingual embeddings** — Sentence-transformers (`paraphrase-multilingual-MiniLM-L12-v2`) for semantic search
-- **FAISS vector store** — Fast similarity search with IndexFlatIP for cosine similarity
-- **Flexible LLM backend** — **Ollama** (local, no API key) or **HuggingFace Inference API** (cloud)
-- **FastAPI** — REST API with `/query` and `/health` endpoints
-- **Gradio UI** — Web interface for interactive Q&A
-- **Source citations** — Every answer includes filename, page number, and similarity scores
+Run one command and get an answer from your indexed docs:
+
+```bash
+$ python -m documind ask "What is the conference format?"
+```
+
+**Example output:**
+
+```
+The conference format typically follows a standard academic structure: submissions are 
+peer-reviewed, accepted papers are presented in oral or poster sessions, and proceedings 
+are published. Specific guidelines (page limits, formatting, deadlines) are defined in 
+the call for papers.
+
+--- Sources ---
+  1. AAAI conference format (1).pdf (page 1)
+  2. AAAI conference format (1).pdf (page 2)
+```
+
+Same via API—one request, answer + sources:
+
+```bash
+$ curl -s -X POST http://localhost:8000/ask -H "Content-Type: application/json" \
+  -d "{\"question\": \"What is the conference format?\"}"
+```
+
+```json
+{"answer":"The conference format typically follows...","sources":[{"source":"AAAI conference format (1).pdf","page":1,...}]}
+```
+
+---
+
+## How to run (5 steps)
+
+1. **Clone and enter the repo**
+   ```bash
+   git clone https://github.com/your-org/DocuMind-RAG.git
+   cd DocuMind-RAG
+   ```
+
+2. **Create a virtual environment and install**
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate          # Windows
+   # source .venv/bin/activate     # macOS/Linux
+   pip install -r requirements.txt
+   ```
+
+3. **Configure (optional)**  
+   Copy `.env.example` to `.env`. Default is **Ollama** (local, no API key). For HuggingFace, set `DOCUMIND_GENERATOR=hf` and `HF_API_KEY`.
+
+4. **Build the index** (put your PDFs in `data/raw_pdfs/` first)
+   ```bash
+   python build_index.py --pdf-dir data/raw_pdfs --output storage/doc_index.index
+   ```
+
+5. **Ask a question**
+   - **CLI:** `python -m documind ask "Your question here"`
+   - **API:** Start the server with `python main.py`, then `curl -X POST http://localhost:8000/ask -H "Content-Type: application/json" -d "{\"question\": \"Your question here\"}"`
+
+That’s it. No need to know Python or where the index lives—one command or one curl and you get an answer with sources.
+
+---
+
+## What you get
+
+| Feature | Description |
+|--------|-------------|
+| **One-command CLI** | `python -m documind ask "..."` — answer and sources printed to the terminal |
+| **One-request API** | `POST /ask` with `{"question": "..."}` → `{"answer": "...", "sources": [...]}` |
+| **PDF ingestion** | Load from a directory, extract text per page, chunk with tiktoken |
+| **Semantic search** | Multilingual embeddings (sentence-transformers) + FAISS vector store |
+| **LLM flexibility** | Ollama (local, default) or HuggingFace Inference API |
+| **Source citations** | Every answer includes document and page references |
+| **REST + UI** | FastAPI with `/health`, `/query`, `/ask`; optional Gradio UI |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────┐    ┌──────────────┐    ┌─────────────────┐
-│  PDFs           │───▶│  Load &      │───▶│  Chunk          │
-│  data/raw_pdfs/ │    │  Extract     │    │  (tiktoken)     │
-└─────────────────┘    └──────────────┘    └────────┬────────┘
-                                                    │
-                                                    ▼
-┌─────────────────┐    ┌──────────────┐    ┌─────────────────┐
-│  Answer +       │◀───│  LLM         │◀───│  Embed &        │
-│  Sources        │    │  (Ollama/HF) │    │  Index (FAISS)  │
-└─────────────────┘    └──────────────┘    └─────────────────┘
-         ▲                        ▲
-         │                        │
-         └────────────────────────┘
-              Query flow
+PDFs → Load & extract → Chunk (tiktoken) → Embed → FAISS index
+                                                      ↓
+Answer + sources ← Generate (Ollama/HF) ← Retrieve top-k ← Question
 ```
 
-**Build-time:** PDFs → Load → Chunk → Embed → FAISS index  
-**Query-time:** Question → Embed → Retrieve top-k → Combine context → Generate answer
-
----
-
-## Prerequisites
-
-- **Python 3.10+**
-- **Ollama** (recommended for local LLM) — [ollama.com](https://ollama.com)  
-  Or **HuggingFace API key** (for cloud inference)
-- For Ollama: `ollama run llama3` (or your preferred model)
-
----
-
-## Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/your-org/DocuMind-RAG.git
-cd DocuMind-RAG
-
-# Create virtual environment (recommended)
-python -m venv .venv
-.venv\Scripts\activate   # Windows
-# source .venv/bin/activate   # macOS/Linux
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy environment template and configure
-copy .env.example .env
-# Edit .env with your HF_API_KEY (if using HuggingFace) or leave DOCUMIND_GENERATOR=ollama
-```
+- **Build-time:** PDFs in `data/raw_pdfs/` → index in `storage/doc_index.index`
+- **Query-time:** Question → embed → similarity search → context → LLM → answer + sources
 
 ---
 
 ## Configuration
 
-Copy `.env.example` to `.env` and configure:
-
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DOCUMIND_GENERATOR` | `ollama` or `hf` | `ollama` |
-| `HF_API_KEY` | HuggingFace token (required for `hf`) | — |
-| `OLLAMA_URL` | Ollama server URL | `http://localhost:11434` |
-| `OLLAMA_MODEL` | Ollama model name | `llama3` |
-| `HF_MODEL` | HuggingFace model (when `hf`) | `mistralai/Mistral-7B-Instruct-v0.2` |
-| `DOCUMIND_API_URL` | API base URL for Gradio UI | `http://localhost:8000` |
+| `OLLAMA_URL` | Ollama server | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Model name | `llama3` |
+| `HF_API_KEY` | HuggingFace token (for `hf`) | — |
+| `HF_MODEL` | HuggingFace model | `mistralai/Mistral-7B-Instruct-v0.2` |
+
+**Prerequisites:** Python 3.10+. For Ollama: [ollama.com](https://ollama.com), then `ollama run llama3`.
 
 ---
 
-## Quick Start
-
-### 1. Build the vector index
-
-Place PDFs in `data/raw_pdfs/`, then:
-
-```bash
-python build_index.py --pdf-dir data/raw_pdfs --output storage/doc_index.index
-```
-
-Options:
-- `--chunk-size` — Tokens per chunk (default: 512)
-- `--overlap` — Overlap between chunks (default: 64)
-- `--verbose` — Debug logging
-
-### 2. Start the API server
-
-```bash
-python main.py
-```
-
-Or with uvicorn:
-
-```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-API runs at `http://localhost:8000`. Docs: `http://localhost:8000/docs`
-
-### 3. Launch the Gradio UI (optional)
-
-```bash
-python app_gradio.py
-```
-
-Opens a web interface to query your documents. Ensure the API is running first.
-
----
-
-## API Reference
+## API reference
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Health check; returns `{"status": "ok"}` |
-| `/query` | POST | Query the RAG pipeline |
+| `/health` | GET | `{"status": "ok"}` |
+| `/ask` | POST | Body: `{"question": "..."}` → `{"answer": "...", "sources": [...]}` |
+| `/query` | POST | Same as `/ask` plus similarity `scores` in the response |
 
-**POST /query** — Request body:
-```json
-{
-  "question": "What is the main topic of the document?"
-}
-```
-
-Response:
-```json
-{
-  "answer": "The document discusses...",
-  "sources": [
-    {"filename": "paper.pdf", "page_number": 3, "chunk_index": 1}
-  ],
-  "scores": [0.89, 0.85, ...]
-}
-```
+Interactive docs: `http://localhost:8000/docs` when the server is running.
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
 DocuMind-RAG/
 ├── main.py              # FastAPI app
-├── app_gradio.py        # Gradio UI
+├── app_gradio.py        # Gradio UI (optional)
 ├── build_index.py       # Index build script
-├── requirements.txt
-├── .env.example
+├── documind/            # CLI: python -m documind ask "..."
 ├── src/
 │   ├── pipeline.py      # Full RAG pipeline (retrieve + generate)
 │   ├── embeddings/      # MultilingualEmbedder
-│   ├── ingestion/       # PDF loader, chunker
-│   ├── vectorstore/     # FAISS store
-│   ├── retrieval/       # Retriever, RAG retrieval pipeline
-│   └── generation/      # OllamaGenerator, HFGenerator
-├── data/raw_pdfs/       # PDF input directory
+│   ├── ingestion/      # PDF loader, chunker
+│   ├── vectorstore/    # FAISS store
+│   ├── retrieval/      # Retriever, RAG retrieval pipeline
+│   └── generation/     # OllamaGenerator, HFGenerator
+├── data/raw_pdfs/       # PDF input
 ├── storage/             # FAISS index output
-├── scripts/             # check_ollama.py, check_hf_connection.py
 └── tests/
 ```
-
----
-
-## LLM Backends
-
-### Ollama (default, local)
-
-- No API key required
-- Runs entirely on your machine
-- Test connectivity: `python scripts/check_ollama.py`
-
-### HuggingFace Inference API
-
-- Requires `HF_API_KEY` in `.env`
-- Set `DOCUMIND_GENERATOR=hf`
-- Test connectivity: `python scripts/check_hf_connection.py`
 
 ---
 

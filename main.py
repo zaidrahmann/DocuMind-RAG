@@ -60,6 +60,19 @@ class QueryOutput(BaseModel):
     scores: list[float] = Field(..., description="Similarity scores for each chunk")
 
 
+class AskInput(BaseModel):
+    """Request body for POST /ask."""
+
+    question: str = Field(..., min_length=1, description="User question")
+
+
+class AskOutput(BaseModel):
+    """Response body for POST /ask (answer + sources only)."""
+
+    answer: str = Field(..., description="Generated answer")
+    sources: list[dict] = Field(..., description="Source metadata for each chunk")
+
+
 class HealthOutput(BaseModel):
     """Response body for GET /health."""
 
@@ -126,6 +139,46 @@ async def query(input_data: QueryInput) -> QueryOutput:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Error processing query: {str(e)}",
+        )
+
+
+@app.post("/ask", response_model=AskOutput, responses={
+    400: {"model": ErrorDetail, "description": "Invalid request"},
+    503: {"model": ErrorDetail, "description": "Pipeline unavailable"},
+})
+async def ask(input_data: AskInput) -> AskOutput:
+    """Ask a question. Returns answer and sources. One-liner: curl -X POST .../ask -H 'Content-Type: application/json' -d '{\"question\": \"...\"}'."""
+    if rag_pipeline is None:
+        logger.error("Ask attempted but RAG pipeline is not initialized")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RAG pipeline is not available",
+        )
+    question = input_data.question.strip()
+    if not question:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="question must be non-empty",
+        )
+    try:
+        logger.info("Processing ask: %s", question[:80] + ("..." if len(question) > 80 else ""))
+        result = await asyncio.to_thread(rag_pipeline.ask, question)
+        logger.info("Ask completed successfully")
+        return AskOutput(
+            answer=result["answer"],
+            sources=result["sources"],
+        )
+    except ValueError as e:
+        logger.warning("Invalid ask: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.exception("Unexpected error processing ask: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Error processing ask: {str(e)}",
         )
 
 
