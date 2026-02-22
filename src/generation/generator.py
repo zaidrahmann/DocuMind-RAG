@@ -7,8 +7,6 @@ import os
 import time
 from typing import Any
 
-import requests
-
 from dotenv import load_dotenv
 
 # Load .env from cwd or parent dirs (standard protocol)
@@ -17,6 +15,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 ENV_HF_API_KEY = "HF_API_KEY"
+ENV_HF_MODEL = "HF_MODEL"  # optional override; default uses Mistral-7B (flan-t5 deprecated on HF API)
 
 _PROMPT_TEMPLATE = """Answer the question using ONLY the context below.
 If the answer is not in the context, say 'Not found in documents.'
@@ -28,26 +27,65 @@ Question:
 {question}"""
 
 
-class HFGenerator:
-    """Free HuggingFace inference generator using api-inference.huggingface.co."""
+def _connection_error_message(exc: Exception) -> str:
+    """Build a user-friendly message for connection/auth failures."""
+    err_str = str(exc).strip()
+    err_first_line = err_str.split("\n")[0][:120] if err_str else ""
+    hint = f"\n\n_Technical note: {type(exc).__name__}: {err_first_line}_"
 
-    DEFAULT_ENDPOINT = "https://api-inference.huggingface.co/models/google/flan-t5-base"
-    DEFAULT_TIMEOUT = 30
+    if "401" in err_str or "Unauthorized" in err_str or "authentication" in err_str.lower():
+        return (
+            "**HuggingFace rejected your API key.** Please check:\n"
+            "• HF_API_KEY in .env is correct — create or copy at https://huggingface.co/settings/tokens\n"
+            "• Token type is **Read** or has **Inference** access (not only 'Write')\n"
+            "• If you just created the token, wait a minute and try again"
+            + hint
+        )
+    if "403" in err_str or "forbidden" in err_str.lower():
+        return (
+            "**Access forbidden.** The model or API may require you to accept terms or use a different token scope. "
+            "Check https://huggingface.co/settings/tokens and try a token with Inference access."
+            + hint
+        )
+    if "timeout" in err_str.lower() or "timed out" in err_str.lower():
+        return "The AI service took too long to respond. Please try again." + hint
+    if any(x in err_str.lower() for x in ("connection", "resolve", "network", "refused", "nodename", "getaddrinfo")):
+        return (
+            "**Could not reach the AI service.** Please check:\n"
+            "• Your internet connection\n"
+            "• Firewall/proxy allows https://api-inference.huggingface.co\n"
+            "• If using a VPN or corporate network, try disabling or using a different network"
+            + hint
+        )
+    return (
+        "**We couldn't connect to the AI service.** Please check:\n"
+        "• Your internet connection\n"
+        "• Your HuggingFace API key (HF_API_KEY in .env) at https://huggingface.co/settings/tokens\n"
+        "• That https://api-inference.huggingface.co is reachable in your browser"
+        + hint
+    )
+
+
+class HFGenerator:
+    """HuggingFace inference generator using InferenceClient (flan-t5 deprecated on classic API)."""
+
+    DEFAULT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
+    DEFAULT_TIMEOUT = 60
     MAX_RETRIES = 3
     RETRY_DELAY = 5
 
     def __init__(
         self,
         api_key: str | None = None,
-        endpoint: str | None = None,
+        model: str | None = None,
         timeout: int | None = None,
     ) -> None:
         """Initialize the generator.
 
         Args:
             api_key: HuggingFace API key. Reads HF_API_KEY from environment if not set.
-            endpoint: Model endpoint URL. Uses google/flan-t5-base if not set.
-            timeout: Request timeout in seconds. Uses 30 if not set.
+            model: Model ID. Uses HF_MODEL or Mistral-7B by default (flan-t5 deprecated).
+            timeout: Request timeout in seconds. Uses 60 if not set.
         """
         self.api_key = api_key or os.environ.get(ENV_HF_API_KEY, "").strip()
         if not self.api_key:
@@ -55,26 +93,24 @@ class HFGenerator:
                 f"HuggingFace API key required. Set {ENV_HF_API_KEY} in .env "
                 "(see .env.example) or pass api_key to HFGenerator()."
             )
-        self.endpoint = endpoint or self.DEFAULT_ENDPOINT
+        self.model = (
+            model
+            or os.environ.get(ENV_HF_MODEL, "").strip()
+            or self.DEFAULT_MODEL
+        )
         self.timeout = timeout if timeout is not None else self.DEFAULT_TIMEOUT
-        self._session = requests.Session()
-        self._session.headers.update(
-            {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            }
+        try:
+            from huggingface_hub import InferenceClient
+        except ImportError:
+            raise ImportError("huggingface_hub is required. Install with: pip install huggingface_hub")
+        self._client = InferenceClient(
+            token=self.api_key,
+            timeout=self.timeout,
+            provider="hf-inference",
         )
 
     def generate(self, question: str, context: str) -> str:
-        """Generate an answer from the question and retrieved context.
-
-        Args:
-            question: User question.
-            context: Retrieved context text (chunks from RAG).
-
-        Returns:
-            Clean string answer. Returns fallback message on errors.
-        """
+        """Generate an answer from the question and retrieved context."""
         if not question or not isinstance(question, str):
             raise ValueError("question must be a non-empty string")
         if context is None:
@@ -85,76 +121,38 @@ class HFGenerator:
         prompt = _PROMPT_TEMPLATE.format(
             context=context.strip(), question=question.strip()
         )
-        payload: dict[str, Any] = {
-            "inputs": prompt,
-            "parameters": {"max_new_tokens": 128, "return_full_text": False},
-        }
 
-        resp: requests.Response | None = None
         for attempt in range(self.MAX_RETRIES):
             try:
                 logger.debug("HF inference request (attempt %d)", attempt + 1)
-                resp = self._session.post(
-                    self.endpoint,
-                    json=payload,
-                    timeout=self.timeout,
+                out = self._client.text_generation(
+                    prompt,
+                    model=self.model,
+                    max_new_tokens=256,
+                    return_full_text=False,
                 )
+                if isinstance(out, str):
+                    return out.strip() or "No answer generated."
+                if hasattr(out, "generated_text"):
+                    text = getattr(out, "generated_text", "") or ""
+                    return (text if isinstance(text, str) else str(text)).strip() or "No answer generated."
+                return str(out).strip() or "No answer generated."
 
-                if resp.status_code == 429:
-                    logger.warning("Rate limited (429). Retrying in %ds...", self.RETRY_DELAY)
-                    time.sleep(self.RETRY_DELAY)
-                    continue
+            except Exception as e:
+                err_str = str(e).lower()
+                logger.warning("HF inference attempt %d failed: %s", attempt + 1, e)
 
-                if resp.status_code == 503:
-                    logger.warning(
-                        "Model loading (503). Retrying in %ds...", self.RETRY_DELAY
-                    )
-                    time.sleep(self.RETRY_DELAY)
-                    continue
+                if "503" in str(e) or "loading" in err_str:
+                    if attempt < self.MAX_RETRIES - 1:
+                        time.sleep(self.RETRY_DELAY)
+                        continue
+                    return "Model is loading. Please try again in a minute."
 
-                resp.raise_for_status()
+                if attempt == self.MAX_RETRIES - 1 or any(
+                    x in str(e) or x in err_str for x in ("401", "403", "connection", "timeout")
+                ):
+                    return _connection_error_message(e)
 
-                data = resp.json()
-                err = self._check_error_response(data)
-                if err:
-                    return err
-                return self._extract_generated_text(data)
-
-            except requests.Timeout:
-                logger.warning("Request timeout (attempt %d/%d)", attempt + 1, self.MAX_RETRIES)
-                if attempt == self.MAX_RETRIES - 1:
-                    return "Request timed out. Please try again."
                 time.sleep(self.RETRY_DELAY)
-            except requests.RequestException as e:
-                logger.error("Request error: %s", e)
-                return "Unable to reach the inference service."
-            except (ValueError, KeyError, TypeError) as e:
-                resp_preview = (resp.text[:200] if resp is not None else "")
-                logger.error("JSON parsing error: %s (response: %s)", e, resp_preview)
-                return "Invalid response from inference service."
 
         return "Too many retries. Please try again later."
-
-    def _check_error_response(self, data: Any) -> str | None:
-        """Return error message if response is an error, else None."""
-        if isinstance(data, dict) and "error" in data:
-            msg = str(data.get("error", "Unknown error"))
-            logger.warning("HF API error response: %s", msg)
-            if "loading" in msg.lower():
-                return "Model is loading. Please try again shortly."
-            return f"Inference error: {msg}"
-        return None
-
-    def _extract_generated_text(self, data: Any) -> str:
-        """Extract generated text from HF API response. Handles multiple formats."""
-        if isinstance(data, list) and len(data) > 0:
-            item = data[0]
-            if isinstance(item, dict):
-                text = item.get("generated_text", "")
-                if isinstance(text, str):
-                    return text.strip()
-        if isinstance(data, dict):
-            text = data.get("generated_text", "")
-            if isinstance(text, str):
-                return text.strip()
-        return "Invalid response format."

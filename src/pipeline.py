@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, TypedDict
 
-from src.generation import HFGenerator
+from src.generation import HFGenerator, OllamaGenerator
 from src.retrieval import RAGPipeline as RetrievalPipeline
 from src.retrieval.retriever import EmbedderProtocol
+
+
+def _default_generator() -> HFGenerator | OllamaGenerator:
+    """Pick generator from DOCUMIND_GENERATOR env (ollama|hf). Default: ollama (HF API unreliable)."""
+    choice = (os.environ.get("DOCUMIND_GENERATOR", "ollama") or "ollama").strip().lower()
+    if choice == "hf":
+        return HFGenerator()
+    return OllamaGenerator()
 
 
 class AskResult(TypedDict):
@@ -30,7 +39,7 @@ class RAGPipeline:
         embedder: EmbedderProtocol | None = None,
         top_k: int = 5,
         embedding_dim: int | None = None,
-        generator: HFGenerator | None = None,
+        generator: HFGenerator | OllamaGenerator | None = None,
     ) -> None:
         """Initialize pipeline with index path and optional components."""
         self._retrieval = RetrievalPipeline(
@@ -39,7 +48,7 @@ class RAGPipeline:
             top_k=top_k,
             embedding_dim=embedding_dim,
         )
-        self._generator = generator or HFGenerator()
+        self._generator = generator or _default_generator()
 
     def ask(self, question: str, top_k: int | None = None) -> AskResult:
         """Retrieve context, generate answer, return answer + sources + scores.
