@@ -106,9 +106,10 @@ def main() -> int:
 
     logger.info("Generated embeddings: shape=%s", embeddings.shape)
 
-    # 4. Build FAISS store and add embeddings
+    # 4. Build FAISS store and add embeddings (include chunk text for RAG context)
     store = FaissVectorStore(embedding_dim=dim)
-    store.add_embeddings(embeddings, [c.metadata for c in chunks])
+    meta_with_text = [{**c.metadata, "text": c.content} for c in chunks]
+    store.add_embeddings(embeddings, meta_with_text)
 
     # 5. Save index
     args.output.parent.mkdir(parents=True, exist_ok=True)
