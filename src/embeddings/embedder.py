@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import List
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer  # type: ignore[import-untyped]
 
 
 class MultilingualEmbedder:

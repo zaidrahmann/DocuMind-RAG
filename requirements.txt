@@ -15,7 +15,7 @@ tiktoken>=0.5.0       # Token-based chunking (OpenAI tokenizer; aligns with embe
 sentence-transformers>=2.2.0
 
 # === Vector store (store & search embeddings) ===
-chromadb>=0.4.0       # In-memory / persistent vector DB; simple API
+faiss-cpu>=1.7.0      # Industry-standard similarity search; IndexFlatIP for cosine similarity
 
 # === LLM for generation (optional; can use API later) ===
 # Uncomment when you add generation:

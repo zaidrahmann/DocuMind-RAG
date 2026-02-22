@@ -9,6 +9,9 @@ __pycache__/
 .eggs/
 .env
 
+# Test temp files
+tests/_tmp*/
+
 # IDE
 .idea/
 .vscode/
