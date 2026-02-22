@@ -16,6 +16,7 @@ def main() -> int:
         ("Loader", "tests.test_loader"),
         ("FAISS Store", "tests.test_faiss_store"),
         ("Retriever", "tests.test_retriever"),
+        ("RAGPipeline", "tests.test_rag_pipeline"),
         ("Embedder", "tests.test_embedder"),
         ("Full Pipeline", "tests.test_full_pipeline"),
     ]
