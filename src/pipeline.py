@@ -2,21 +2,34 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, TypedDict
 
+from src.config import get_settings
+from src.exceptions import GeneratorUnavailableError
 from src.generation import HFGenerator, OllamaGenerator
 from src.retrieval import RAGPipeline as RetrievalPipeline, Reranker
 from src.retrieval.retriever import EmbedderProtocol
 
 
 def _default_generator() -> HFGenerator | OllamaGenerator:
-    """Pick generator from DOCUMIND_GENERATOR env (ollama|hf). Default: ollama (HF API unreliable)."""
-    choice = (os.environ.get("DOCUMIND_GENERATOR", "ollama") or "ollama").strip().lower()
+    """Pick generator from config (ollama|hf). Default: ollama."""
+    settings = get_settings()
+    choice = (settings.documind_generator or "ollama").strip().lower()
     if choice == "hf":
-        return HFGenerator()
-    return OllamaGenerator()
+        if not settings.hf_api_key:
+            raise GeneratorUnavailableError(
+                "HuggingFace generator selected but HF_API_KEY is not set. "
+                "Set it in .env or use DOCUMIND_GENERATOR=ollama for local LLM."
+            )
+        return HFGenerator(
+            api_key=settings.hf_api_key,
+            model=settings.hf_model or None,
+        )
+    return OllamaGenerator(
+        base_url=settings.ollama_url or None,
+        model=settings.ollama_model or None,
+    )
 
 
 class AskResult(TypedDict):
@@ -54,8 +67,10 @@ class RAGPipeline:
             reranker: Reranker instance; if None and use_reranker, a default Reranker() is used.
         """
         if use_reranker is None:
-            use_reranker = os.environ.get("DOCUMIND_USE_RERANKER", "true").strip().lower() in ("true", "1", "yes")
-        effective_reranker = (reranker or Reranker()) if use_reranker else None
+            use_reranker = get_settings().documind_use_reranker
+        effective_reranker = (
+            reranker or Reranker(model_name=get_settings().documind_reranker_model or None)
+        ) if use_reranker else None
         self._retrieval = RetrievalPipeline(
             index_path=index_path,
             embedder=embedder,

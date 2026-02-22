@@ -8,39 +8,37 @@ for fast similarity search without re-processing documents.
 from __future__ import annotations
 
 import argparse
-import logging
 import sys
 from pathlib import Path
 
+from src.config import get_settings
 from src.embeddings import MultilingualEmbedder
 from src.ingestion import load_pdfs_from_directory, chunk_documents
+from src.logging_config import configure_logging, get_logger
 from src.vectorstore import FaissVectorStore
 
 
 def setup_logging(verbose: bool = False) -> None:
     """Configure logging for the build process."""
-    level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    level = "DEBUG" if verbose else get_settings().documind_log_level
+    configure_logging(level)
 
 
 def main() -> int:
     """Build index from PDFs and save to disk."""
+    settings = get_settings()
     parser = argparse.ArgumentParser(description="Build FAISS index from PDFs")
     parser.add_argument(
         "--pdf-dir",
         type=Path,
-        default=Path("data/raw_pdfs"),
-        help="Directory containing PDF files (default: data/raw_pdfs)",
+        default=settings.documind_pdf_dir,
+        help="Directory containing PDF files",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("storage/doc_index.index"),
-        help="Output index path (default: storage/doc_index.index)",
+        default=settings.index_path,
+        help="Output index path",
     )
     parser.add_argument(
         "--chunk-size",
@@ -63,15 +61,17 @@ def main() -> int:
     args = parser.parse_args()
 
     setup_logging(verbose=args.verbose)
-    logger = logging.getLogger(__name__)
+    logger = get_logger(__name__)
 
-    logger.info("Starting index build: pdf_dir=%s, output=%s", args.pdf_dir, args.output)
+    pdf_dir = args.pdf_dir
+    output = args.output
+    logger.info("Starting index build: pdf_dir=%s, output=%s", pdf_dir, output)
 
     # 1. Load PDFs
-    documents = load_pdfs_from_directory(args.pdf_dir)
+    documents = load_pdfs_from_directory(pdf_dir)
     if not documents:
-        logger.error("No PDFs found in %s. Ensure the directory exists and contains .pdf files.", args.pdf_dir)
-        print(f"Error: No PDFs found in {args.pdf_dir}", file=sys.stderr)
+        logger.error("No PDFs found in %s. Ensure the directory exists and contains .pdf files.", pdf_dir)
+        print(f"Error: No PDFs found in {pdf_dir}", file=sys.stderr)
         return 1
 
     doc_count = len(documents)
@@ -109,9 +109,9 @@ def main() -> int:
     store.add_embeddings(embeddings, meta_with_text)
 
     # 5. Save index
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    store.save(args.output)
-    logger.info("Saved index to %s", args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    store.save(output)
+    logger.info("Saved index to %s", output)
 
     # Print summary counts
     print()
@@ -119,7 +119,7 @@ def main() -> int:
     print(f"  Documents (pages): {doc_count}")
     print(f"  Chunks:            {chunk_count}")
     print(f"  Embedding dim:     {dim}")
-    print(f"  Output:            {args.output}")
+    print(f"  Output:            {output}")
     print()
     return 0
 

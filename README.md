@@ -106,6 +106,7 @@ Answer + sources ← Generate (Ollama/HF) ← Rerank (cross-encoder) ← Retriev
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `DOCUMIND_INDEX_PATH` | Path to FAISS index | `storage/doc_index.index` |
 | `DOCUMIND_GENERATOR` | `ollama` or `hf` | `ollama` |
 | `OLLAMA_URL` | Ollama server | `http://localhost:11434` |
 | `OLLAMA_MODEL` | Model name | `llama3` |
@@ -113,6 +114,8 @@ Answer + sources ← Generate (Ollama/HF) ← Rerank (cross-encoder) ← Retriev
 | `HF_MODEL` | HuggingFace model | `mistralai/Mistral-7B-Instruct-v0.2` |
 | `DOCUMIND_USE_RERANKER` | Use cross-encoder reranking (`true` / `false`) | `true` |
 | `DOCUMIND_RERANKER_MODEL` | Cross-encoder model for reranking | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+| `DOCUMIND_API_URL` | API base URL (Gradio UI) | `http://localhost:8000` |
+| `DOCUMIND_LOG_LEVEL` | Logging level | `INFO` |
 
 **Prerequisites:** Python 3.10+. For Ollama: [ollama.com](https://ollama.com), then `ollama run llama3`.
 
@@ -137,8 +140,12 @@ DocuMind-RAG/
 ├── main.py              # FastAPI app
 ├── app_gradio.py        # Gradio UI (optional)
 ├── build_index.py       # Index build script
+├── pyproject.toml       # Project metadata, tool config (ruff, mypy, pytest)
 ├── documind/            # CLI: python -m documind ask "..."
 ├── src/
+│   ├── config.py        # Centralized settings (Pydantic Settings)
+│   ├── exceptions.py    # Custom exceptions (IndexNotFoundError, etc.)
+│   ├── logging_config.py
 │   ├── pipeline.py      # Full RAG pipeline (retrieve + generate)
 │   ├── embeddings/      # MultilingualEmbedder
 │   ├── ingestion/      # PDF loader, chunker
@@ -147,6 +154,7 @@ DocuMind-RAG/
 │   └── generation/     # OllamaGenerator, HFGenerator
 ├── data/raw_pdfs/       # PDF input
 ├── storage/             # FAISS index output
+├── .github/workflows/   # CI (lint, typecheck, test)
 └── tests/
 ```
 
@@ -155,8 +163,20 @@ DocuMind-RAG/
 ## Tests
 
 ```bash
+pip install -r requirements.txt
 pytest tests/ -v
 ```
+
+---
+
+## Production & development
+
+- **Lint:** `ruff check src documind main.py build_index.py app_gradio.py tests`  
+  Format: `ruff format src documind main.py build_index.py app_gradio.py tests`
+- **Type check:** `mypy src documind` (install mypy: `pip install mypy`)
+- **CI:** GitHub Actions runs lint, typecheck, and tests on push/PR to `main`/`master`.
+- **Config:** All behavior is driven by `src/config.py` (Pydantic Settings). Env vars are documented in the Configuration table and in `.env.example`.
+- **Errors:** 503 responses do not expose internal details; use logs for debugging.
 
 ---
 

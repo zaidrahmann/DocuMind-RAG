@@ -8,8 +8,16 @@ from typing import Any
 import gradio as gr
 import requests
 
-# Default API base URL (override with DOCUMIND_API_URL env var)
-API_BASE = os.environ.get("DOCUMIND_API_URL", "http://localhost:8000")
+def _api_base() -> str:
+    """API base URL from config (DOCUMIND_API_URL)."""
+    try:
+        from src.config import get_settings
+        return get_settings().documind_api_url
+    except Exception:
+        return "http://localhost:8000"
+
+
+API_BASE = _api_base()
 QUERY_URL = f"{API_BASE.rstrip('/')}/query"
 HEALTH_URL = f"{API_BASE.rstrip('/')}/health"
 
