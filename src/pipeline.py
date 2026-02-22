@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from src.generation import HFGenerator, OllamaGenerator
-from src.retrieval import RAGPipeline as RetrievalPipeline
+from src.retrieval import RAGPipeline as RetrievalPipeline, Reranker
 from src.retrieval.retriever import EmbedderProtocol
 
 
@@ -40,13 +40,29 @@ class RAGPipeline:
         top_k: int = 5,
         embedding_dim: int | None = None,
         generator: HFGenerator | OllamaGenerator | None = None,
+        use_reranker: bool | None = None,
+        rerank_top_k: int = 20,
+        reranker: Reranker | None = None,
     ) -> None:
-        """Initialize pipeline with index path and optional components."""
+        """Initialize pipeline with index path and optional components.
+
+        Args:
+            use_reranker: If True, retrieve rerank_top_k candidates, rerank with
+                a cross-encoder, pass top_k to the LLM. Default from env
+                DOCUMIND_USE_RERANKER (true) or True.
+            rerank_top_k: Candidates to retrieve for reranking when enabled (default 20).
+            reranker: Reranker instance; if None and use_reranker, a default Reranker() is used.
+        """
+        if use_reranker is None:
+            use_reranker = os.environ.get("DOCUMIND_USE_RERANKER", "true").strip().lower() in ("true", "1", "yes")
+        effective_reranker = (reranker or Reranker()) if use_reranker else None
         self._retrieval = RetrievalPipeline(
             index_path=index_path,
             embedder=embedder,
             top_k=top_k,
             embedding_dim=embedding_dim,
+            reranker=effective_reranker,
+            rerank_top_k=rerank_top_k,
         )
         self._generator = generator or _default_generator()
 

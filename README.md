@@ -83,6 +83,9 @@ That’s it. No need to know Python or where the index lives—one command or on
 | **LLM flexibility** | Ollama (local, default) or HuggingFace Inference API |
 | **Source citations** | Every answer includes document and page references |
 | **REST + UI** | FastAPI with `/health`, `/query`, `/ask`; optional Gradio UI |
+| **Reranking** | Retrieve top-20, rerank with a cross-encoder, pass top-5 to the LLM—better precision than “vector search only” |
+
+**Beyond tutorial RAG:** retrieval is not just “embed and search.” We retrieve more candidates (e.g. 20), then rerank (query, chunk) pairs with a small cross-encoder and pass only the top-5 to the LLM. That improves answer quality without changing the rest of the stack.
 
 ---
 
@@ -91,7 +94,7 @@ That’s it. No need to know Python or where the index lives—one command or on
 ```
 PDFs → Load & extract → Chunk (tiktoken) → Embed → FAISS index
                                                       ↓
-Answer + sources ← Generate (Ollama/HF) ← Retrieve top-k ← Question
+Answer + sources ← Generate (Ollama/HF) ← Rerank (cross-encoder) ← Retrieve top-20 ← Question
 ```
 
 - **Build-time:** PDFs in `data/raw_pdfs/` → index in `storage/doc_index.index`
@@ -108,6 +111,8 @@ Answer + sources ← Generate (Ollama/HF) ← Retrieve top-k ← Question
 | `OLLAMA_MODEL` | Model name | `llama3` |
 | `HF_API_KEY` | HuggingFace token (for `hf`) | — |
 | `HF_MODEL` | HuggingFace model | `mistralai/Mistral-7B-Instruct-v0.2` |
+| `DOCUMIND_USE_RERANKER` | Use cross-encoder reranking (`true` / `false`) | `true` |
+| `DOCUMIND_RERANKER_MODEL` | Cross-encoder model for reranking | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 
 **Prerequisites:** Python 3.10+. For Ollama: [ollama.com](https://ollama.com), then `ollama run llama3`.
 
@@ -138,7 +143,7 @@ DocuMind-RAG/
 │   ├── embeddings/      # MultilingualEmbedder
 │   ├── ingestion/      # PDF loader, chunker
 │   ├── vectorstore/    # FAISS store
-│   ├── retrieval/      # Retriever, RAG retrieval pipeline
+│   ├── retrieval/      # Retriever, Reranker, RAG pipeline
 │   └── generation/     # OllamaGenerator, HFGenerator
 ├── data/raw_pdfs/       # PDF input
 ├── storage/             # FAISS index output
