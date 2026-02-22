@@ -1,0 +1,26 @@
+# DocuMind-RAG — Production-ready RAG pipeline dependencies
+# Install with: pip install -r requirements.txt
+
+# === Environment & API ===
+python-dotenv>=1.0.0   # Load .env (API keys, paths) without hardcoding
+fastapi>=0.109.0      # Modern async API framework
+uvicorn[standard]>=0.27.0   # ASGI server to run the API
+
+# === Document ingestion (PDF → text) ===
+pypdf>=4.0.0          # Extract text from PDFs (pure Python, no system deps)
+tiktoken>=0.5.0       # Token-based chunking (OpenAI tokenizer; aligns with embedding/LLM limits)
+
+# === Embeddings (text → vectors for similarity search) ===
+# We use sentence-transformers: open-source, runs locally, multilingual.
+sentence-transformers>=2.2.0
+
+# === Vector store (store & search embeddings) ===
+chromadb>=0.4.0       # In-memory / persistent vector DB; simple API
+
+# === LLM for generation (optional; can use API later) ===
+# Uncomment when you add generation:
+# openai>=1.0.0
+# Or for local: ollama, together, etc.
+
+# === Utilities ===
+pydantic>=2.0.0       # Data validation (used by FastAPI and our models)
