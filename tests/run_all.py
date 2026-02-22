@@ -15,6 +15,7 @@ def main() -> int:
         ("Chunker", "tests.test_chunker"),
         ("Loader", "tests.test_loader"),
         ("FAISS Store", "tests.test_faiss_store"),
+        ("Retriever", "tests.test_retriever"),
         ("Embedder", "tests.test_embedder"),
         ("Full Pipeline", "tests.test_full_pipeline"),
     ]
