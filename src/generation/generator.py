@@ -17,14 +17,18 @@ logger = logging.getLogger(__name__)
 ENV_HF_API_KEY = "HF_API_KEY"
 ENV_HF_MODEL = "HF_MODEL"  # optional override; default uses Mistral-7B (flan-t5 deprecated on HF API)
 
-_PROMPT_TEMPLATE = """Answer the question using ONLY the context below.
-If the answer is not in the context, say 'Not found in documents.'
+_SYSTEM_PROMPT = (
+    "You are a helpful assistant that answers questions strictly based on the provided context. "
+    "If the answer is not present in the context, say 'Not found in documents.' "
+    "Be concise and factual."
+)
 
-Context:
+_USER_TEMPLATE = """Context:
 {context}
 
-Question:
-{question}"""
+Question: {question}
+
+Answer using ONLY the context above."""
 
 
 def _connection_error_message(exc: Exception) -> str:
@@ -69,8 +73,8 @@ def _connection_error_message(exc: Exception) -> str:
 class HFGenerator:
     """HuggingFace inference generator using InferenceClient (flan-t5 deprecated on classic API)."""
 
-    DEFAULT_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
-    DEFAULT_TIMEOUT = 60
+    DEFAULT_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+    DEFAULT_TIMEOUT = 90
     MAX_RETRIES = 3
     RETRY_DELAY = 5
 
@@ -106,7 +110,6 @@ class HFGenerator:
         self._client = InferenceClient(
             token=self.api_key,
             timeout=self.timeout,
-            provider="hf-inference",
         )
 
     def generate(self, question: str, context: str) -> str:
@@ -118,25 +121,22 @@ class HFGenerator:
         if not isinstance(context, str):
             raise ValueError("context must be a string")
 
-        prompt = _PROMPT_TEMPLATE.format(
-            context=context.strip(), question=question.strip()
-        )
-
         for attempt in range(self.MAX_RETRIES):
             try:
-                logger.debug("HF inference request (attempt %d)", attempt + 1)
-                out = self._client.text_generation(
-                    prompt,
+                logger.debug("HF chat_completion request (attempt %d)", attempt + 1)
+                messages = [
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": _USER_TEMPLATE.format(
+                        context=context.strip(), question=question.strip()
+                    )},
+                ]
+                out = self._client.chat_completion(
+                    messages=messages,
                     model=self.model,
-                    max_new_tokens=256,
-                    return_full_text=False,
+                    max_tokens=512,
                 )
-                if isinstance(out, str):
-                    return out.strip() or "No answer generated."
-                if hasattr(out, "generated_text"):
-                    text = getattr(out, "generated_text", "") or ""
-                    return (text if isinstance(text, str) else str(text)).strip() or "No answer generated."
-                return str(out).strip() or "No answer generated."
+                text = out.choices[0].message.content or ""
+                return text.strip() or "No answer generated."
 
             except Exception as e:
                 err_str = str(e).lower()
