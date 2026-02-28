@@ -36,18 +36,75 @@ def check_backend_status() -> tuple[str, str]:
         )
 
 
+def _relevance_badge(score: float) -> tuple[str, str]:
+    """Return (emoji label, hex color) based on cross-encoder score."""
+    if score >= 0.5:
+        return "High relevance", "#155724"
+    if score >= -1.0:
+        return "Good match", "#856404"
+    if score >= -3.0:
+        return "Partial match", "#7a3e0a"
+    return "Low relevance", "#721c24"
+
+
+def _relevance_bg(score: float) -> str:
+    if score >= 0.5:
+        return "#d4edda"
+    if score >= -1.0:
+        return "#fff3cd"
+    if score >= -3.0:
+        return "#fde8d8"
+    return "#f8d7da"
+
+
 def format_sources(sources: list[dict[str, Any]], scores: list[float] | None = None) -> str:
-    """Format sources as readable text."""
+    """Format sources as styled HTML cards."""
     if not sources:
-        return "_No sources retrieved._"
-    lines = []
+        return "<p style='color:#888; font-style:italic;'>No sources retrieved.</p>"
+
+    cards = []
     for i, src in enumerate(sources):
-        score_str = f" (score: {scores[i]:.3f})" if scores and i < len(scores) else ""
-        filename = src.get("filename", "Unknown")
-        page = src.get("page_number", "?")
-        chunk = src.get("chunk_index", "?")
-        lines.append(f"• **{filename}** – page {page}, chunk {chunk}{score_str}")
-    return "\n".join(lines)
+        filename = src.get("filename", "Unknown document")
+        page = src.get("page_number")
+        preview = (src.get("text") or "")[:220].strip()
+        if preview and len(src.get("text", "")) > 220:
+            preview += "…"
+
+        location = f"Page {page}" if page is not None else ""
+
+        # Relevance badge
+        badge_html = ""
+        if scores and i < len(scores):
+            label, color = _relevance_badge(scores[i])
+            bg = _relevance_bg(scores[i])
+            badge_html = (
+                f'<span style="background:{bg}; color:{color}; padding:2px 10px; '
+                f'border-radius:12px; font-size:0.78em; font-weight:600;">{label}</span>'
+            )
+
+        preview_html = ""
+        if preview:
+            preview_html = (
+                f'<div style="margin-top:8px; padding:6px 10px; border-left:3px solid #ccc; '
+                f'color:#555; font-size:0.85em; font-style:italic; line-height:1.5;">'
+                f'{preview}</div>'
+            )
+
+        card = f"""
+<div style="border:1px solid #dde3ea; border-radius:10px; padding:12px 14px;
+            background:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,.06);">
+  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <span style="font-size:1em;">📄</span>
+    <span style="font-weight:700; color:#1a1a1a; font-size:0.95em;">{filename}</span>
+    {f'<span style="color:#888; font-size:0.85em;">·</span><span style="color:#555; font-size:0.85em;">{location}</span>' if location else ''}
+    {badge_html}
+  </div>
+  {preview_html}
+</div>"""
+        cards.append(card)
+
+    header = f'<p style="font-size:0.8em; color:#888; margin-bottom:8px;">{len(sources)} source(s) retrieved</p>'
+    return header + '<div style="display:flex; flex-direction:column; gap:8px;">' + "".join(cards) + "</div>"
 
 
 def ask(question: str) -> tuple[str, str]:
@@ -133,7 +190,7 @@ with gr.Blocks(title="DocuMind – Enterprise RAG System") as demo:
         ask_btn = gr.Button("Ask", variant="primary", scale=1, size="lg")
 
     with gr.Row():
-        with gr.Column(scale=1):
+        with gr.Column(scale=5):
             gr.Markdown("### Answer")
             answer_box = gr.Textbox(
                 label="",
@@ -142,10 +199,10 @@ with gr.Blocks(title="DocuMind – Enterprise RAG System") as demo:
                 max_lines=15,
                 interactive=False,
             )
-        with gr.Column(scale=1):
+        with gr.Column(scale=4):
             gr.Markdown("### Sources")
-            sources_box = gr.Markdown(
-                "_Retrieved document chunks will appear here after each query._"
+            sources_box = gr.HTML(
+                "<p style='color:#888; font-style:italic;'>Retrieved sources will appear here after each query.</p>"
             )
 
     ask_btn.click(

@@ -9,6 +9,17 @@ __pycache__/
 .eggs/
 .env
 
+# Document data and generated indexes (do not push to GitHub)
+/data/raw_pdfs/*
+!/data/raw_pdfs/.gitkeep
+/storage/*
+!/storage/.gitkeep
+!/storage/README.md
+
+# Binary index and metadata (e.g. FAISS + chunk metadata)
+*.index
+*.meta.json
+
 # Test temp files
 tests/_tmp*/
 

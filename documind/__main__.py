@@ -28,8 +28,8 @@ def _run_ask(question: str, index_path: Path) -> int:
     if result["sources"]:
         print("\n--- Sources ---")
         for i, src in enumerate(result["sources"], 1):
-            title = src.get("title") or src.get("source") or "Chunk"
-            page = src.get("page")
+            title = src.get("title") or src.get("source") or src.get("filename") or "Unknown"
+            page = src.get("page") or src.get("page_number")
             part = f" (page {page})" if page is not None else ""
             print(f"  {i}. {title}{part}")
     return 0

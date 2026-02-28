@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # HuggingFace
     hf_api_key: str = Field(default="", description="HuggingFace API key for inference.")
     hf_model: str = Field(
-        default="mistralai/Mistral-7B-Instruct-v0.2",
+        default="Qwen/Qwen2.5-7B-Instruct",
         description="HuggingFace model for inference.",
     )
 

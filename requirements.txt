@@ -27,3 +27,4 @@ gradio>=4.0.0         # Web UI for RAG queries
 # === Utilities ===
 pydantic>=2.0.0       # Data validation (used by FastAPI and our models)
 pydantic-settings>=2.0.0   # Environment-based config (src/config.py)
+watchdog>=3.0.0       # File system event watcher for PDF hot-reload
