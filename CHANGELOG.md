@@ -8,7 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- (Placeholder for upcoming changes.)
+- **`GET /knowledge-base` endpoint:** Returns detailed index statistics: per-document breakdown (filename, page count, chunk count), total chunk count, and chunking configuration (strategy, chunk size, overlap).
+- **Gradio knowledge base panel:** "Knowledge base" accordion in the UI with a "View details" button to inspect document counts and chunking settings.
+- **`DOCUMIND_PORT`:** Configurable API server port (default 8000). Use when port 8000 is already in use; set `DOCUMIND_API_URL` to match for the Gradio UI.
+- **Build metadata:** Index builds now write `storage/doc_index.build.json` with chunk_size, overlap, and strategy for the knowledge-base endpoint.
+
+### Changed
+
+- **`doc_count` semantics:** Status and `/status` now report the number of **source PDF files** (unique filenames), not page count. Previously reported pages (e.g. 22) instead of PDFs (e.g. 3).
+- **Hot-reload on delete:** Removing a PDF from `data/raw_pdfs/` triggers an index rebuild (previously only create/modify did).
+- **Server startup:** API server starts even when the index file is missing; status shows `no_index` and queries return 503 until an index is built.
+- **Gradio UI:** Improved layout, status pill with integrated refresh button, wider container, Gradio 6.0 compatibility (CSS moved to `launch()`).
+
+### Fixed
+
+- **Exception chaining:** Re-raised exceptions in `/ask` and `/query` now use `raise ... from e` for proper traceback linking (mypy/CI compliance).
+- **Type annotations:** Added type guards and annotations for mypy (faiss_store, loader, reranker, embedder, indexer). Added `types-requests` for ollama_generator.
 
 ## [1.1.0] - 2025-02-28
 

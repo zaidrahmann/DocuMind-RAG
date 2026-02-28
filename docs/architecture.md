@@ -63,8 +63,8 @@ DocuMind-RAG is a Retrieval-Augmented Generation (RAG) pipeline that:
 
 ### API and UI
 
-- **main.py:** FastAPI app. Endpoints: `/health`, `/status`, `/ask`, `/query`. Lifespan: load RAG pipeline from index, start watchdog on `data/raw_pdfs/`, on shutdown stop observer and clear pipeline. Hot-reload: on PDF create/modify (with debounce), rebuild index in a thread and swap pipeline atomically. `/status` exposes index stats and watcher state.
-- **app_gradio.py:** Gradio UI that calls the API (`/query`) for questions and displays answers with source citations.
+- **main.py:** FastAPI app. Endpoints: `/health`, `/status`, `/knowledge-base`, `/ask`, `/query`. Lifespan: load RAG pipeline from index (or start with `no_index` if missing), start watchdog on `data/raw_pdfs/`, on shutdown stop observer and clear pipeline. Hot-reload: on PDF create, modify, or **delete** (with debounce), rebuild index and swap pipeline atomically. `/status` exposes index stats; `/knowledge-base` exposes per-document breakdown and chunking config.
+- **app_gradio.py:** Gradio UI that calls the API for questions and displays answers with source citations. Includes a knowledge base details panel showing document counts and chunking configuration.
 
 ### CLI
 
@@ -80,8 +80,9 @@ DocuMind-RAG is a Retrieval-Augmented Generation (RAG) pipeline that:
 
 | Path | Purpose |
 |------|---------|
-| `data/raw_pdfs/` | Input PDFs (watched for hot-reload) |
+| `data/raw_pdfs/` | Input PDFs (watched for hot-reload: create, modify, delete) |
 | `storage/doc_index.index` | FAISS binary index |
 | `storage/doc_index.meta.json` | Chunk metadata (and text) for retrieval |
+| `storage/doc_index.build.json` | Build config (chunk_size, overlap, strategy) for `/knowledge-base` |
 
 Configuration is centralized in `src/config.py` (Pydantic Settings from environment and `.env`).

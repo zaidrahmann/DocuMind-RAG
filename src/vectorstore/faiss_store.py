@@ -83,6 +83,7 @@ class FaissVectorStore:
             )
 
         _normalize_vectors(embeddings)
+        assert self._index is not None  # Type guard for mypy (set by build_index above)
         self._index.add(embeddings)
         self._metadata.extend(metadata)
         logger.debug("Added %d vectors; total=%d", embeddings.shape[0], self._index.ntotal)

@@ -42,6 +42,8 @@ This document covers local setup, running tests, and code conventions for contri
 
    Use `http://localhost:8000/docs` for the API UI. For the Gradio UI run `python app_gradio.py` in another terminal.
 
+   If port 8000 is already in use, set `DOCUMIND_PORT=8001` in `.env` (and `DOCUMIND_API_URL=http://localhost:8001` for the Gradio UI).
+
 ## Running Tests
 
 From the project root:
@@ -69,7 +71,7 @@ Configuration lives in `pyproject.toml`.
 mypy src documind
 ```
 
-Install mypy if needed: `pip install mypy`.
+Install mypy and dev dependencies: `pip install mypy` (or `pip install -e ".[dev]"` for pytest, ruff, mypy). The project uses `types-requests` for request stubs; ensure all deps from `requirements.txt` are installed.
 
 ## Project Layout
 
