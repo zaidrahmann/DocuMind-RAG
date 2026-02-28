@@ -56,6 +56,12 @@ class Settings(BaseSettings):
         default="http://localhost:8000",
         description="Base URL for DocuMind API (used by Gradio UI).",
     )
+    documind_port: int = Field(
+        default=8000,
+        ge=1,
+        le=65535,
+        description="Port for the DocuMind API server. Change if 8000 is already in use.",
+    )
     documind_log_level: str = Field(default="INFO", description="Logging level (DEBUG, INFO, WARNING, ERROR).")
 
     # Limits (input validation)

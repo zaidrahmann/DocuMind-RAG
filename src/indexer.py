@@ -6,6 +6,7 @@ watcher in main.py so both always produce identical indexes.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -81,13 +82,24 @@ def build_index(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     store.save(output_path)
 
+    # Save build config for knowledge-base details
+    build_info_path = output_path.with_suffix(".build.json")
+    build_info = {
+        "chunk_size": chunk_size,
+        "overlap": overlap,
+        "strategy": "token-based (tiktoken)",
+    }
+    with open(build_info_path, "w", encoding="utf-8") as f:
+        json.dump(build_info, f, indent=2)
+
+    num_pdfs = len({d.metadata.get("filename") for d in documents})
     logger.info(
-        "Index built: %d docs, %d chunks, dim=%d → %s",
-        len(documents), len(chunks), dim, output_path,
+        "Index built: %d PDFs, %d chunks, dim=%d → %s",
+        num_pdfs, len(chunks), dim, output_path,
     )
 
     return IndexStats(
-        doc_count=len(documents),
+        doc_count=num_pdfs,
         chunk_count=len(chunks),
         embedding_dim=dim,
         output_path=output_path,
