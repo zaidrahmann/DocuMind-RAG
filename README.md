@@ -84,7 +84,7 @@ That's it. No need to know Python or where the index lives -- one command or one
 | **Semantic search** | Multilingual embeddings (sentence-transformers) + FAISS vector store |
 | **LLM flexibility** | Ollama (local, default) or HuggingFace Inference API |
 | **Source citations** | Every answer includes document and page references |
-| **REST + UI** | FastAPI with `/health`, `/status`, `/ask`, `/query`; optional Gradio UI |
+| **REST + UI** | FastAPI with `/health`, `/status`, `/knowledge-base`, `/ask`, `/query`; Gradio UI with knowledge base details |
 | **Hot-reload** | Drop a PDF into the watched directory -- index rebuilds automatically, no restart needed |
 | **Reranking** | Retrieve top-20, rerank with a cross-encoder, pass top-5 to the LLM -- better precision than "vector search only" |
 
@@ -107,14 +107,14 @@ Answer + sources <- Generate (Ollama/HF) <- Rerank (cross-encoder) <- Retrieve t
 
 ## Hot-reload
 
-Drop a PDF into `data/raw_pdfs/` while the server is running -- the index rebuilds automatically, with no restart needed.
+Add, modify, or **delete** a PDF in `data/raw_pdfs/` while the server is running — the index rebuilds automatically with no restart.
 
 ```bash
 python main.py          # start server; watchdog begins watching data/raw_pdfs/
 cp my_new_doc.pdf data/raw_pdfs/   # triggers automatic re-index (5-second debounce)
 ```
 
-The `/status` endpoint shows the current watcher state, document count, and last indexed time. In-flight requests complete against the old index; new requests immediately use the newly built one.
+The `/status` endpoint shows the watcher state, **PDF count** (not page count), and last indexed time. In-flight requests complete against the old index; new requests use the newly built one.
 
 ---
 
@@ -132,6 +132,7 @@ The `/status` endpoint shows the current watcher state, document count, and last
 | `DOCUMIND_USE_RERANKER` | Use cross-encoder reranking (`true` / `false`) | `true` |
 | `DOCUMIND_RERANKER_MODEL` | Cross-encoder model for reranking | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
 | `DOCUMIND_API_URL` | API base URL (Gradio UI) | `http://localhost:8000` |
+| `DOCUMIND_PORT` | API server port (use if 8000 is already in use) | `8000` |
 | `DOCUMIND_LOG_LEVEL` | Logging level | `INFO` |
 | `DOCUMIND_MAX_QUESTION_LENGTH` | Max characters allowed in a question | `4096` |
 | `DOCUMIND_MAX_TOP_K` | Max retrieval candidates (top-k) | `50` |
@@ -145,7 +146,8 @@ The `/status` endpoint shows the current watcher state, document count, and last
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | `{"status": "ok"}` -- liveness check |
-| `/status` | GET | Index stats: `status`, `doc_count`, `chunk_count`, `embedding_dim`, `last_indexed`, `watching_dir`, `last_error` |
+| `/status` | GET | Index stats: `status`, `doc_count` (PDFs), `chunk_count`, `embedding_dim`, `last_indexed`, `watching_dir`, `last_error` |
+| `/knowledge-base` | GET | Detailed stats: per-document breakdown, chunking config (size, overlap, strategy) |
 | `/ask` | POST | Body: `{"question": "..."}` returns `{"answer": "...", "sources": [...]}` |
 | `/query` | POST | Same as `/ask` plus similarity `scores` in the response |
 

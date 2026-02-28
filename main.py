@@ -16,7 +16,7 @@ import json
 import threading
 import time
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -398,19 +398,19 @@ async def query(input_data: QueryInput) -> QueryOutput:
     try:
         question = _validate_question(input_data.question)
     except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message) from e
     try:
         logger.info("Query: %s", question[:80] + ("..." if len(question) > 80 else ""))
         result = await asyncio.to_thread(rag_pipeline.ask, question)
         logger.info("Query complete")
         return QueryOutput(answer=result["answer"], sources=result["sources"], scores=result["scores"])
     except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message) from e
     except DocuMindError as e:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=SERVICE_UNAVAILABLE_MESSAGE)
-    except Exception:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=SERVICE_UNAVAILABLE_MESSAGE) from e
+    except Exception as e:
         logger.exception("Unexpected error processing query")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=SERVICE_UNAVAILABLE_MESSAGE)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=SERVICE_UNAVAILABLE_MESSAGE) from e
 
 
 @app.post(
@@ -430,19 +430,19 @@ async def ask(input_data: AskInput) -> AskOutput:
     try:
         question = _validate_question(input_data.question)
     except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message) from e
     try:
         logger.info("Ask: %s", question[:80] + ("..." if len(question) > 80 else ""))
         result = await asyncio.to_thread(rag_pipeline.ask, question)
         logger.info("Ask complete")
         return AskOutput(answer=result["answer"], sources=result["sources"])
     except ValidationError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=e.message) from e
     except DocuMindError as e:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=SERVICE_UNAVAILABLE_MESSAGE)
-    except Exception:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=SERVICE_UNAVAILABLE_MESSAGE) from e
+    except Exception as e:
         logger.exception("Unexpected error processing ask")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=SERVICE_UNAVAILABLE_MESSAGE)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=SERVICE_UNAVAILABLE_MESSAGE) from e
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

@@ -47,7 +47,8 @@ All runtime behavior is driven by environment variables and optional `.env` file
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `DOCUMIND_API_URL` | string | `http://localhost:8000` | Base URL of the DocuMind API. Used by the Gradio UI to call the backend. |
+| `DOCUMIND_API_URL` | string | `http://localhost:8000` | Base URL of the DocuMind API. Used by the Gradio UI to call the backend. Set to match `DOCUMIND_PORT` if you change the port (e.g. `http://localhost:8001`). |
+| `DOCUMIND_PORT` | int | `8000` | Port for the API server. Use if 8000 is already in use (e.g. another instance). Range: 1–65535. |
 | `DOCUMIND_LOG_LEVEL` | string | `INFO` | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`. |
 
 ### Validation Limits
@@ -80,6 +81,13 @@ HF_MODEL=Qwen/Qwen2.5-7B-Instruct
 DOCUMIND_INDEX_PATH=storage/doc_index.index
 DOCUMIND_PDF_DIR=data/raw_pdfs
 DOCUMIND_LOG_LEVEL=DEBUG
+```
+
+**Different port (when 8000 is in use):**
+
+```env
+DOCUMIND_PORT=8001
+DOCUMIND_API_URL=http://localhost:8001
 ```
 
 ## Code Access

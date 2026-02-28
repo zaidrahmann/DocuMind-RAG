@@ -62,7 +62,10 @@ def build_index(
 
     # 3. Embed
     embedder = MultilingualEmbedder()
-    dim = embedder.model.get_sentence_embedding_dimension()
+    dim_raw = embedder.model.get_sentence_embedding_dimension()
+    if not isinstance(dim_raw, int):
+        raise TypeError(f"Expected int for embedding dimension, got {type(dim_raw)}")
+    dim = dim_raw
     texts = [c.content for c in chunks]
     embeddings = embedder.encode_documents(
         texts, normalize_embeddings=True, show_progress=show_progress

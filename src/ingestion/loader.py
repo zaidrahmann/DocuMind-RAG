@@ -1,8 +1,9 @@
 """Load PDFs from a directory into Document objects."""
 
-from pathlib import Path
 from dataclasses import dataclass
 import logging
+from pathlib import Path
+from typing import Any
 
 from pypdf import PdfReader
 
@@ -17,7 +18,7 @@ class Document:
     metadata: dict
 
 
-def _extract_text_safe(page) -> str:
+def _extract_text_safe(page: Any) -> str:
     """Extract text from a PDF page; returns stripped string or empty string."""
     try:
         text = page.extract_text()

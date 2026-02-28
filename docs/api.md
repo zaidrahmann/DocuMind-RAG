@@ -42,13 +42,44 @@ Index and watcher status. Use this to see document count, chunk count, last inde
 
 | Field | Description |
 |-------|-------------|
-| `status` | `initializing` \| `ready` \| `indexing` \| `error` |
-| `doc_count` | Number of source documents (by filename) in the current index |
+| `status` | `initializing` \| `ready` \| `indexing` \| `error` \| `no_index` (index file missing) |
+| `doc_count` | Number of source PDF files in the current index (unique filenames, not pages) |
 | `chunk_count` | Number of indexed chunks |
 | `embedding_dim` | Vector dimension |
 | `last_indexed` | ISO-8601 UTC timestamp of last successful index build |
 | `watching_dir` | Directory watched for PDF changes (hot-reload) |
 | `last_error` | Last indexing error message (empty if none) |
+
+---
+
+#### `GET /knowledge-base`
+
+Detailed knowledge base statistics: per-document breakdown (filename, page count, chunk count) and chunking configuration.
+
+**Response:** `200 OK`
+
+```json
+{
+  "total_document_count": 3,
+  "total_chunk_count": 45,
+  "documents": [
+    { "filename": "doc1.pdf", "page_count": 8, "chunk_count": 12 },
+    { "filename": "doc2.pdf", "page_count": 5, "chunk_count": 7 }
+  ],
+  "chunking_strategy": "token-based (tiktoken)",
+  "chunk_size": 512,
+  "overlap": 64
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `total_document_count` | Number of source PDF files |
+| `total_chunk_count` | Total indexed chunks |
+| `documents` | Per-file: filename, pages with content, chunks |
+| `chunking_strategy` | Method used (e.g. token-based) |
+| `chunk_size` | Chunk size in tokens |
+| `overlap` | Overlap between chunks in tokens |
 
 ---
 

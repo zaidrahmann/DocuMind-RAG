@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import List
+from typing import Any
 
 import numpy as np
-from sentence_transformers import SentenceTransformer  # type: ignore[import-untyped]
+from sentence_transformers import SentenceTransformer
 
 
 class MultilingualEmbedder:
@@ -14,7 +14,11 @@ class MultilingualEmbedder:
     _instance: MultilingualEmbedder | None = None
     _model: SentenceTransformer | None = None
 
-    def __new__(cls, model_name: str = "paraphrase-multilingual-MiniLM-L12-v2", **kwargs) -> MultilingualEmbedder:
+    def __new__(
+        cls,
+        model_name: str = "paraphrase-multilingual-MiniLM-L12-v2",
+        **kwargs: Any,
+    ) -> MultilingualEmbedder:
         if cls._instance is None:
             obj = super().__new__(cls)
             cls._instance = obj
@@ -24,7 +28,7 @@ class MultilingualEmbedder:
         self,
         model_name: str = "paraphrase-multilingual-MiniLM-L12-v2",
         device: str | None = None,
-        **model_kwargs,
+        **model_kwargs: Any,
     ) -> None:
         if MultilingualEmbedder._model is None:
             MultilingualEmbedder._model = SentenceTransformer(model_name, device=device, **model_kwargs)
@@ -37,11 +41,11 @@ class MultilingualEmbedder:
 
     def encode_documents(
         self,
-        texts: List[str],
+        texts: list[str],
         batch_size: int = 32,
         show_progress: bool = False,
         normalize_embeddings: bool = False,
-        **encode_kwargs,
+        **encode_kwargs: Any,
     ) -> np.ndarray:
         """Encode document strings into an (N, dim) embedding matrix."""
         if not texts:
@@ -61,7 +65,7 @@ class MultilingualEmbedder:
         self,
         text: str,
         normalize_embeddings: bool = False,
-        **encode_kwargs,
+        **encode_kwargs: Any,
     ) -> np.ndarray:
         """Encode a single query into a 1D embedding vector."""
         embedding = self.model.encode(

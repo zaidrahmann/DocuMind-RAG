@@ -16,7 +16,7 @@ data/
 Place your PDF documents here. They are used when:
 
 - **Building the index:** `python build_index.py --pdf-dir data/raw_pdfs --output storage/doc_index.index`
-- **Hot-reload:** When the API server is running (`python main.py`), it watches this directory. Adding or changing a PDF triggers an automatic index rebuild (after a short debounce).
+- **Hot-reload:** When the API server is running (`python main.py`), it watches this directory. Adding, changing, or **deleting** a PDF triggers an automatic index rebuild (after a short debounce).
 
 ### Notes
 

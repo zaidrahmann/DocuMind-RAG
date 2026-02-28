@@ -9,10 +9,10 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # Lazy import to avoid loading the model until first use
-_CrossEncoder = None
+_CrossEncoder: type[Any] | None = None
 
 
-def _get_cross_encoder():
+def _get_cross_encoder() -> type[Any]:
     global _CrossEncoder
     if _CrossEncoder is None:
         from sentence_transformers import CrossEncoder
@@ -73,6 +73,7 @@ class Reranker:
         if not results:
             return []
         self._ensure_loaded()
+        assert self._model is not None  # Type guard after _ensure_loaded()
         pairs = [
             (question, r["metadata"].get("text", "") or "")
             for r in results
