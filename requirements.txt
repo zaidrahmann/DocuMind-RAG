@@ -1,0 +1,31 @@
+# DocuMind-RAG — Production-ready RAG pipeline dependencies
+# Install with: pip install -r requirements.txt
+
+# === Environment & API ===
+python-dotenv>=1.0.0   # Load .env (API keys, paths) without hardcoding
+requests>=2.28.0       # HTTP client for HuggingFace inference API
+types-requests>=2.28.0 # Type stubs for requests
+fastapi>=0.109.0      # Modern async API framework
+uvicorn[standard]>=0.27.0   # ASGI server to run the API
+
+# === Document ingestion (PDF → text) ===
+pypdf>=4.0.0          # Extract text from PDFs (pure Python, no system deps)
+tiktoken>=0.5.0       # Token-based chunking (OpenAI tokenizer; aligns with embedding/LLM limits)
+
+# === Embeddings (text → vectors for similarity search) ===
+# We use sentence-transformers: open-source, runs locally, multilingual.
+sentence-transformers>=2.2.0
+
+# === Vector store (store & search embeddings) ===
+faiss-cpu>=1.7.0      # Industry-standard similarity search; IndexFlatIP for cosine similarity
+
+# === LLM for generation (HuggingFace Inference API) ===
+huggingface_hub>=0.25.0   # InferenceClient for HF inference (Mistral-7B; flan-t5 deprecated)
+
+# === Gradio UI ===
+gradio>=4.0.0         # Web UI for RAG queries
+
+# === Utilities ===
+pydantic>=2.0.0       # Data validation (used by FastAPI and our models)
+pydantic-settings>=2.0.0   # Environment-based config (src/config.py)
+watchdog>=3.0.0       # File system event watcher for PDF hot-reload
