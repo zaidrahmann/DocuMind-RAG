@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from typing import Any
 
 import gradio as gr
@@ -17,6 +18,36 @@ def _api_base() -> str:
         return "http://localhost:8000"
 
 
+def _format_last_indexed(last_indexed_raw: Any) -> str:
+    """Format last-indexed timestamp with relative minutes-ago text."""
+    if not last_indexed_raw:
+        return "—"
+
+    value = str(last_indexed_raw).strip()
+    if not value or value == "—":
+        return "—"
+
+    normalized = value.replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(normalized)
+    except ValueError:
+        return value
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    now_utc = datetime.now(timezone.utc)
+    minutes_ago = max(0, int((now_utc - dt.astimezone(timezone.utc)).total_seconds() // 60))
+    if minutes_ago == 0:
+        relative = "just now"
+    elif minutes_ago == 1:
+        relative = "1 minute ago"
+    else:
+        relative = f"{minutes_ago} minutes ago"
+
+    return f"{dt.isoformat()} ({relative})"
+
+
 API_BASE = _api_base()
 QUERY_URL = f"{API_BASE.rstrip('/')}/query"
 HEALTH_URL = f"{API_BASE.rstrip('/')}/health"
@@ -24,8 +55,8 @@ STATUS_URL = f"{API_BASE.rstrip('/')}/status"
 KNOWLEDGE_BASE_URL = f"{API_BASE.rstrip('/')}/knowledge-base"
 
 
-def check_backend_status() -> tuple[str, str]:
-    """Check if the backend API is reachable. Returns (status_emoji, status_text)."""
+def check_backend_status() -> tuple[str, str, str, str]:
+    """Check backend API reachability and return status, mode, and indexing timestamp."""
     try:
         r = requests.get(HEALTH_URL, timeout=3)
         if r.ok:
@@ -36,43 +67,44 @@ def check_backend_status() -> tuple[str, str]:
                     st = data.get("status", "ready")
                     doc_count = data.get("doc_count", 0)
                     last_mode = data.get("last_index_mode", "—")
-                    last_indexed = data.get("last_indexed", "") or "—"
+                    last_indexed = _format_last_indexed(data.get("last_indexed", "") or "—")
                     if st == "no_index":
-                        return "🟡", (
-                            "Ready (no index — add PDFs and build or drop a PDF) "
-                            f"· Last mode: {last_mode} · Last indexed: {last_indexed}"
-                        )
-                    if st == "ready" and doc_count >= 0:
-                        return "🟢", (
-                            f"Ready ({doc_count} PDF{'s' if doc_count != 1 else ''}) "
-                            f"· Last mode: {last_mode} · Last indexed: {last_indexed}"
+                        return "🟡", "Ready (no index — add PDFs and build or drop a PDF)", last_mode, last_indexed
+                    if st == "ready":
+                        return (
+                            "🟢",
+                            f"Ready ({doc_count} PDF{'s' if doc_count != 1 else ''})",
+                            last_mode,
+                            last_indexed,
                         )
                     if st == "indexing":
-                        return "🟡", (
-                            "Indexing… "
-                            f"· Last mode: {last_mode} · Last indexed: {last_indexed}"
-                        )
+                        return "🟡", "Indexing…", last_mode, last_indexed
                     if st == "error":
                         err = (data.get("last_error") or "")[:80]
                         base = f"Error: {err}" if err else "Backend error"
-                        return "🟡", (
-                            f"{base} · Last mode: {last_mode} · Last indexed: {last_indexed}"
-                        )
+                        return "🟡", base, last_mode, last_indexed
             except Exception:
                 pass
-            return "🟢", "Ready"
-        return "🟡", "Backend returned an error"
+            return "🟢", "Ready", "—", "—"
+        return "🟡", "Backend returned an error", "—", "—"
     except requests.RequestException:
-        return "🔴", (
+        return (
+            "🔴",
             "Backend not running. Start it with:\n"
-            "`python main.py` or `uvicorn main:app --reload --port 8000`"
+            "`python main.py` or `uvicorn main:app --reload --port 8000`",
+            "—",
+            "—",
         )
 
 
 def get_status_markdown() -> str:
     """Return status bar markdown; used for initial load, manual refresh, and polling."""
-    emoji, text = check_backend_status()
-    return f"**Status:** {emoji} {text}"
+    emoji, text, last_mode, last_indexed = check_backend_status()
+    return (
+        f"**Status:** {emoji} {text}  \n"
+        f"**Last mode:** {last_mode}  \n"
+        f"**Last indexed:** {last_indexed}"
+    )
 
 
 def fetch_knowledge_base_details() -> str:
@@ -305,15 +337,15 @@ footer { display: none !important; }
 /* ── Status pill ────────────────────────────────────────────── */
 .status-row {
     display: flex !important;
-    align-items: center !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
     background: var(--block-background-fill);
     border: 1px solid var(--border-color-primary);
-    border-radius: 999px;
-    padding: 6px 8px 6px 16px;
-    gap: 10px;
+    border-radius: 12px;
+    padding: 10px 12px;
+    gap: 8px;
     margin-bottom: 1.2rem;
 }
-.status-row > div:first-child { flex: 1; min-width: 0; }
 .status-row .status-bar,
 .status-row .status-bar > div {
     margin: 0 !important;
@@ -323,7 +355,11 @@ footer { display: none !important; }
     box-shadow: none !important;
     min-height: 0 !important;
 }
-.status-row .status-bar p { margin: 0; font-size: 0.88rem; }
+.status-row .status-bar p {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
 .status-row .status-refresh-btn button {
     border-radius: 999px !important;
     padding: 4px 14px !important;
@@ -334,7 +370,12 @@ footer { display: none !important; }
     white-space: nowrap;
     flex-shrink: 0;
 }
-.status-row .status-refresh-btn { flex-shrink: 0; width: auto !important; min-width: 0 !important; }
+.status-row .status-refresh-btn {
+    flex-shrink: 0;
+    width: auto !important;
+    min-width: 0 !important;
+    align-self: flex-end;
+}
 
 /* ── Question row ───────────────────────────────────────────── */
 .question-row { gap: 12px !important; align-items: flex-end !important; }
@@ -378,7 +419,6 @@ with gr.Blocks(title="DocuMind – Enterprise RAG System") as demo:
     """)
 
     # ── Status pill ─────────────────────────────────────────────────
-    emoji, _ = check_backend_status()
     with gr.Row(elem_classes=["status-row"]):
         status_bar = gr.Markdown(
             get_status_markdown(),
